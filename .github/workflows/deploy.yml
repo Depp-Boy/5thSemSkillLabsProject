@@ -1,0 +1,39 @@
+name: Build, Test, and Deploy to AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  cicd-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Stage 1 - Checkout
+        uses: actions/checkout@v4
+
+      - name: Stage 2 - Build
+        run: docker build -t devops-showcase .
+
+      - name: Stage 3 - Test
+        run: chmod +x test.sh && ./test.sh
+
+      - name: Stage 4 - Package
+        run: docker images | grep devops-showcase
+
+      - name: Stage 5 - Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/app
+            git pull origin main
+            docker stop showcase-app || true
+            docker rm showcase-app || true
+            docker build -t devops-showcase .
+            docker run -d -p 80:80 --name showcase-app --restart always devops-showcase
+            docker image prune -f
